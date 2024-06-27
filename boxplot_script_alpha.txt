@@ -1,0 +1,89 @@
+library(vegan)
+library(ggplot2)
+library("microbiome")
+library("phyloseq")
+library("dplyr")
+library("tidyr")
+library(viridis)
+
+#reading data
+abundance_table = read.table("/Users/mayanne/Documents/alpha_diversity_gut_fish_microbiome_t.tsv",  sep='\t', header=TRUE, stringsAsFactors = TRUE, check.names = FALSE)
+head(abundance_table)
+
+# Check if data is numeric
+abundance_table[] <- lapply(abundance_table, as.numeric)
+
+# Check data structure
+str(abundance_table)
+
+print(abundance_table)
+# Criar a tabela OTU
+otu_matrix <- as.matrix(abundance_table)
+otu_table <- otu_table(otu_matrix, taxa_are_rows = TRUE)
+
+# Check OTU table
+print(otu_table)
+
+
+physeq <- phyloseq(otu_table)
+
+# Check the object phyloseq
+print(physeq)
+
+# Calculate the aplha diversity
+alpha_diversity <- estimate_richness(physeq, measures = c("Shannon", "Simpson", "Chao1"))
+write.table(alpha_diversity, file = "alpha_diversity_results.tsv", sep = "\t", quote = FALSE, row.names = TRUE)
+
+# Check the results
+print(alpha_diversity)
+
+# convert alpha_diversity to a data frame and add the samples as a column
+alpha_diversity_df <- data.frame(sample_id = rownames(alpha_diversity), alpha_diversity)
+rownames(alpha_diversity_df) <- NULL
+
+print(alpha_diversity_df)
+
+
+alpha_diversity <- read.table("alpha_diversity_results_simple_fish_final.tsv", sep='\t', header = TRUE, stringsAsFactors = FALSE, check.names = FALSE)
+
+# Converting relevant columns to numeric if necessary
+alpha_diversity[, -1] <- sapply(alpha_diversity[, -1], as.numeric)
+
+
+# Group data for ggplot
+alpha_diversity_long <- alpha_diversity %>%
+  pivot_longer(cols = -sample_id, names_to = "metric", values_to = "value")
+
+
+#  boxplot
+
+ordem_amostras <- c(
+  "Acanthurus chirurgus (F)",
+  "Acanthurus chirurgus (MF)",
+  "Acanthurus chirurgus (M)",
+  "Acanthurus chirurgus (EM)",
+  "Acanthurus chirurgus (H)",
+  "Kyphosus sp. (F)",
+  "Kyphosus sp. (MF)",
+  "Kyphosus sp. (M)",
+  "Kyphosus sp. (EM)",
+  "Kyphosus sp. (H)",
+  "Scarus trispinosus (F)",
+  "Scarus trispinosus (M)",
+  "Scarus trispinosus (H)",
+  "Sparisoma axillare (F)",
+  "Sparisoma axillare (M)",
+  "Sparisoma axillare (H)"
+)
+
+# Covert sample_id to factor with specific order
+alpha_diversity_long$sample_id <- factor(alpha_diversity_long$sample_id, levels = ordem_amostras)
+
+ggplot(alpha_diversity_long, aes(x = sample_id, y = value, fill = metric)) +
+  geom_boxplot() +
+  labs(x = "Sample ID", y = "Alpha Diversity Value", fill = "Metric") +
+  facet_wrap(~ metric, scales = "free_y", ncol = 1) +
+  theme_light() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1)) +
+  scale_fill_viridis(discrete = TRUE) +
+  geom_point()
